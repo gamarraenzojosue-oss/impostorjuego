@@ -2,7 +2,7 @@
 
 :root {
   --black-pure: #000000;
-  --black-light: #121212; /* Fondo de la tarjeta */
+  --black-light: #121212;
   --modern-red: #ff3131;
   --modern-blue: #00d2ff;
   --input-gray: #2a2a2a;
@@ -26,13 +26,14 @@ body {
   border: 2px solid var(--modern-blue);
   border-radius: 20px;
   padding: 40px;
-  width: 100%;
+  width: 90%;
   max-width: 500px;
-  box-shadow: 0 0 20px rgba(0, 210, 255, 0.3); /* Glow azul */
+  box-shadow: 0 0 20px rgba(0, 210, 255, 0.3);
   text-align: center;
+  position: relative;
 }
 
-/* Título Grande y Rojo */
+/* Títulos */
 h1 {
   color: var(--modern-red);
   font-size: 3rem;
@@ -42,49 +43,44 @@ h1 {
   letter-spacing: -1px;
 }
 
-/* Etiquetas y Texto General */
-label {
-  display: block;
-  text-align: left;
-  font-size: 0.9rem;
-  margin-bottom: 8px;
-  color: var(--text-white);
-  font-weight: 600;
-}
-
-/* Inputs Grises Modernos */
-input[type="number"] {
-  background-color: var(--input-gray);
-  border: 1px solid #333;
-  border-radius: 8px;
+/* Botón Invitar Flotante (Ahora abajo a la derecha) */
+.btn-invite-fixed {
+  position: fixed;
+  bottom: 25px;
+  right: 20px;
+  z-index: 1000;
+  background: linear-gradient(135deg, #00b4db, #0083b0);
   color: white;
-  padding: 12px;
-  width: 100%;
-  margin-bottom: 20px;
-  font-size: 1rem;
-  outline: none;
-  transition: border 0.3s;
-}
-
-input[type="number"]:focus {
-  border: 1px solid var(--modern-blue);
-}
-
-/* Contenedor de Botones Separados */
-.button-group {
+  border: none;
+  padding: 12px 20px;
+  border-radius: 50px;
+  font-weight: bold;
+  font-size: 0.85rem;
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: transform 0.2s;
   display: flex;
-  flex-direction: column;
-  gap: 15px;
-  margin-top: 20px;
+  align-items: center;
+  gap: 8px;
 }
 
-/* Botones con Glow */
+.btn-invite-fixed:active {
+  transform: scale(0.9);
+}
+
+/* Unificación de Botones Modernos */
 .btn-modern {
   background-color: transparent;
   color: white;
   border: 2px solid var(--modern-blue);
-  padding: 15px;
-  border-radius: 10px;
+  width: 100%;
+  max-width: 280px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 8px auto;
+  border-radius: 12px;
   font-weight: 700;
   text-transform: uppercase;
   cursor: pointer;
@@ -98,19 +94,81 @@ input[type="number"]:focus {
   box-shadow: 0 0 25px rgba(0, 210, 255, 0.6);
 }
 
-/* Estilo específico para "Empezar" si quieres que resalte más */
-.btn-start {
-  border-color: var(--modern-blue);
+/* Estilos Específicos de Botones */
+.btn-next-round {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%) !important;
+  color: #051937 !important;
+  border: none !important;
 }
 
-/* Texto del Impostor en Rojo */
+.btn-danger {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 49, 49, 0.4) !important;
+  color: var(--modern-red) !important;
+}
+
+.btn-danger:hover {
+  background-color: var(--modern-red) !important;
+  color: white !important;
+}
+
+.btn-back {
+  background: none;
+  border: 1px solid #333;
+  color: #666;
+  padding: 8px 15px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  margin-bottom: 25px;
+  transition: 0.3s;
+  display: inline-block;
+}
+
+.btn-back:hover {
+  border-color: var(--modern-red);
+  color: var(--modern-red);
+}
+
+/* Inputs y Formulario */
+.setup-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+input[type="number"], .input-box {
+  background-color: var(--input-gray);
+  border: 1px solid #333;
+  border-radius: 8px;
+  color: white;
+  padding: 12px;
+  width: 100%;
+  max-width: 280px;
+  margin-bottom: 10px;
+  font-size: 1rem;
+  outline: none;
+}
+
+/* Otros Elementos */
+.ronda-indicador {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 6px 15px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  margin-bottom: 20px;
+  color: var(--modern-blue);
+  border: 1px solid rgba(0, 210, 255, 0.2);
+  display: inline-block;
+}
+
 .text-impostor {
   color: var(--modern-red);
-  font-size: 4rem;
+  font-size: 3.5rem;
   font-weight: 900;
   text-transform: uppercase;
   margin: 20px 0;
-  display: block;
 }
 
 .text-palabra {
@@ -120,59 +178,96 @@ input[type="number"]:focus {
   display: block;
 }
 
-/* Checkbox Moderno */
-.checkbox-container {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 20px;
-  cursor: pointer;
-}
-.btn-back {
-  background: none;
-  border: 1px solid #333;
-  color: #666;
-  padding: 5px 10px;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 0.7rem;
-  margin-bottom: 20px;
-  transition: 0.3s;
-}
-
-.btn-back:hover {
-  border-color: var(--modern-red);
-  color: var(--modern-red);
-}
-
-.player-item p {
-  margin: 5px 0 0 0;
-  font-size: 0.8rem;
-}
-.btn-copy {
-  background: #1a1a1a;
-  border: 1px solid var(--modern-blue);
-  color: var(--modern-blue);
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-size: 0.7rem;
-  cursor: pointer;
-  margin-bottom: 15px;
-}
-
-.btn-danger {
-  border-color: var(--modern-red) !important;
-  color: var(--modern-red) !important;
-  margin-top: 20px;
-}
-
-.btn-danger:hover {
-  background-color: var(--modern-red) !important;
-  color: white !important;
-}
-
 .pista-text {
   color: #888;
   font-style: italic;
   margin-top: 10px;
+}
+/* --- NUEVOS ESTILOS PARA MARCADOR Y RESUMEN --- */
+
+/* Contenedor del Marcador en la Arena */
+.scoreboard {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 12px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  border: 1px solid rgba(0, 210, 255, 0.2);
+  width: 100%;
+}
+
+.score-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.score-label {
+  font-size: 0.65rem;
+  color: #888;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+
+.score-num {
+  font-size: 1.8rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+/* Pantalla de Resumen Final */
+.resumen-final {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  animation: fadeIn 0.6s ease-out;
+}
+
+.resumen-final h1 {
+  text-align: center;
+  font-size: 1.8rem;
+  margin-bottom: 10px;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+}
+
+/* Lista del Historial */
+.history-container {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 15px;
+  border-radius: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.9rem;
+}
+
+.history-item:last-child {
+  border-bottom: none;
+}
+
+.history-impostor {
+  color: #ff3131; /* Rojo para resaltar al impostor */
+  font-weight: bold;
+}
+
+.history-win {
+  color: #43e97b; /* Verde para victorias del equipo */
+  font-weight: bold;
+}
+
+/* Animación simple para que el resumen aparezca suave */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
