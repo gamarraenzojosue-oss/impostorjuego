@@ -271,3 +271,32 @@ input[type="number"], .input-box {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+.category-grid-mini {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr; /* 3 columnas para que sea compacto */
+  gap: 8px;
+}
+
+.btn-cat-mini {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 8px;
+  font-size: 0.7rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.btn-cat-mini.active {
+  background: #00d2ff;
+  color: black;
+  border-color: white;
+  font-weight: bold;
+}
+
+.next-round-box {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 15px;
+  border-radius: 15px;
+  width: 100%;
+}

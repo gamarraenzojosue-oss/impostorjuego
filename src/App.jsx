@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import "./App.css";
-import { listaPalabras } from "./data/palabras";
+import { categoriasPalabras } from "./data/palabras"; // Importamos el nuevo objeto con categorías
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, set, onValue, update, remove } from "firebase/database";
+import { getDatabase, ref, set, onValue, update } from "firebase/database";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBQEI6qDBQKH8Afk-ZrvD8xLknqFBTJmUk",
@@ -34,13 +34,13 @@ export default function App() {
   const [numRondas, setNumRondas] = useState(3);
   const [rondaActual, setRondaActual] = useState(1);
   const [conPista, setConPista] = useState(true);
+  const [categoria, setCategoria] = useState(null); // NUEVO: Estado para la categoría
 
   const [jugadoresLista, setJugadoresLista] = useState([]);
   const [miRol, setMiRol] = useState(null);
   const [palabraRonda, setPalabraRonda] = useState("");
   const [jugadorActualLocal, setJugadorActualLocal] = useState(0);
 
-  // NUEVOS ESTADOS PARA MARCADOR E HISTORIAL
   const [puntosEquipo, setPuntosEquipo] = useState(0);
   const [puntosImpostores, setPuntosImpostores] = useState(0);
   const [historialRondas, setHistorialRondas] = useState([]);
@@ -66,6 +66,7 @@ export default function App() {
           setRondaActual(data.rondaActual || 1);
           setConPista(data.config?.conPista ?? true);
           setNumRondas(data.config?.numRondas || 3);
+          setCategoria(data.categoria || null); // Sincronizar categoría
           setPuntosEquipo(data.puntosEquipo || 0);
           setPuntosImpostores(data.puntosImpostores || 0);
           setHistorialRondas(data.historialRondas || []);
@@ -76,16 +77,14 @@ export default function App() {
           if (yo) setMiRol(yo);
 
           if (data.etapa === "revelar") {
-             setRevelado(false);
-             setVerRecordatorio(false);
+              setRevelado(false);
+              setVerRecordatorio(false);
           }
-        } else {
-          if (conectado && etapa !== "configuracion") volverAlInicio();
         }
       });
       return () => unsubscribe();
     }
-  }, [modo, salaId, conectado, nombre, etapa]);
+  }, [modo, salaId, conectado, nombre]);
 
   const volverAlInicio = () => {
     setModo("inicio");
@@ -100,6 +99,7 @@ export default function App() {
     setPuntosEquipo(0);
     setPuntosImpostores(0);
     setHistorialRondas([]);
+    setCategoria(null); // Reset categoría
     window.history.replaceState({}, document.title, "/");
   };
 
@@ -108,21 +108,14 @@ export default function App() {
       .then(() => alert("¡Link de invitación copiado!"));
   };
 
-  // LÓGICA DE REPARTO DE ROLES (Compartida)
-  const generarRolesUpdates = (itemsPalabra) => {
-    const updates = {};
-    let baraja = [...jugadoresLista].sort(() => Math.random() - 0.5);
-    jugadoresLista.forEach((p) => {
-      const esImp = baraja.slice(0, numImpostores).some(imp => imp.nombre === p.nombre);
-      updates[`salas/${salaId}/jugadores/${p.nombre}/tipo`] = esImp ? "impostor" : "jugador";
-      updates[`salas/${salaId}/jugadores/${p.nombre}/pista`] = (esImp && conPista) ? itemsPalabra.pistas[0] : null;
-      updates[`salas/${salaId}/jugadores/${p.nombre}/vivo`] = true;
-    });
-    return updates;
+  // Lógica para obtener palabra aleatoria según categoría elegida
+  const obtenerPalabraAleatoria = () => {
+    const lista = categoriasPalabras[categoria] || categoriasPalabras["OBJETOS"];
+    return lista[Math.floor(Math.random() * lista.length)];
   };
 
   const iniciarJuegoLocal = () => {
-    const item = listaPalabras[Math.floor(Math.random() * listaPalabras.length)];
+    const item = obtenerPalabraAleatoria();
     setPalabraRonda(item.palabra);
     let roles = Array(Number(numJugadores)).fill(null).map((_, i) => ({
       nombre: `JUGADOR ${i + 1}`, tipo: "jugador", vivo: true
@@ -154,6 +147,7 @@ export default function App() {
       puntosEquipo: 0,
       puntosImpostores: 0,
       historialRondas: [],
+      categoria: categoria, // Guardar categoría en Firebase
       config: { numJugadores, numImpostores, conPista, numRondas },
       jugadores: { [nombre.toUpperCase()]: { nombre: nombre.toUpperCase(), vivo: true, host: true } }
     }).then(() => setEtapa("lobby"));
@@ -171,18 +165,27 @@ export default function App() {
 
   const finalizarRondaOnline = (ganador) => {
     const impostorNombre = jugadoresLista.find(p => p.tipo === "impostor")?.nombre || "???";
-    const nuevoHistorial = [...historialRondas, { ronda: rondaActual, impostor: impostorNombre, ganoImpostor: ganador === 'impostor' }];
+    const nuevoHistorial = [
+      ...(historialRondas || []), 
+      { ronda: rondaActual, impostor: impostorNombre, ganoImpostor: ganador === 'impostor' }
+    ];
     
     const updates = {};
     updates[`salas/${salaId}/puntosEquipo`] = puntosEquipo + (ganador === 'equipo' ? 1 : 0);
     updates[`salas/${salaId}/puntosImpostores`] = puntosImpostores + (ganador === 'impostor' ? 1 : 0);
     updates[`salas/${salaId}/historialRondas`] = nuevoHistorial;
 
-    if (rondaActual >= numRondas) {
+    if (nuevoHistorial.length >= Number(numRondas)) {
       updates[`salas/${salaId}/etapa`] = "decision_final";
     } else {
-      const item = listaPalabras[Math.floor(Math.random() * listaPalabras.length)];
-      Object.assign(updates, generarRolesUpdates(item));
+      const item = obtenerPalabraAleatoria();
+      let baraja = [...jugadoresLista].sort(() => Math.random() - 0.5);
+      jugadoresLista.forEach((p) => {
+        const esImp = baraja.slice(0, numImpostores).some(imp => imp.nombre === p.nombre);
+        updates[`salas/${salaId}/jugadores/${p.nombre}/tipo`] = esImp ? "impostor" : "jugador";
+        updates[`salas/${salaId}/jugadores/${p.nombre}/pista`] = (esImp && conPista) ? item.pistas[0] : null;
+        updates[`salas/${salaId}/jugadores/${p.nombre}/vivo`] = true;
+      });
       updates[`salas/${salaId}/palabraRonda`] = item.palabra;
       updates[`salas/${salaId}/rondaActual`] = rondaActual + 1;
       updates[`salas/${salaId}/etapa`] = "revelar";
@@ -190,14 +193,27 @@ export default function App() {
     update(ref(db), updates);
   };
 
-  const forzarSiguienteRonda = () => {
-    const item = listaPalabras[Math.floor(Math.random() * listaPalabras.length)];
-    const updates = generarRolesUpdates(item);
-    updates[`salas/${salaId}/palabraRonda`] = item.palabra;
-    updates[`salas/${salaId}/rondaActual`] = rondaActual + 1;
-    updates[`salas/${salaId}/etapa`] = "revelar";
-    update(ref(db), updates);
-  };
+  const forzarSiguienteRonda = (nuevaCategoria = null) => {
+  // Si se pasa una nueva categoría, la usamos, si no, la que ya estaba
+  const catActiva = nuevaCategoria || categoria;
+  const lista = categoriasPalabras[catActiva];
+  const item = lista[Math.floor(Math.random() * lista.length)];
+  
+  const updates = {};
+  let baraja = [...jugadoresLista].sort(() => Math.random() - 0.5);
+  jugadoresLista.forEach((p) => {
+    const esImp = baraja.slice(0, numImpostores).some(imp => imp.nombre === p.nombre);
+    updates[`salas/${salaId}/jugadores/${p.nombre}/tipo`] = esImp ? "impostor" : "jugador";
+    updates[`salas/${salaId}/jugadores/${p.nombre}/pista`] = (esImp && conPista) ? item.pistas[0] : null;
+    updates[`salas/${salaId}/jugadores/${p.nombre}/vivo`] = true;
+  });
+
+  updates[`salas/${salaId}/palabraRonda`] = item.palabra;
+  updates[`salas/${salaId}/categoria`] = catActiva; // Actualizamos la categoría en Firebase
+  updates[`salas/${salaId}/rondaActual`] = etapa === "decision_final" ? rondaActual + 1 : rondaActual;
+  updates[`salas/${salaId}/etapa`] = "revelar";
+  update(ref(db), updates);
+};
 
   return (
     <div className="main-card">
@@ -217,9 +233,25 @@ export default function App() {
         </div>
       )}
 
-      {etapa === "configuracion" && modo !== "inicio" && !conectado && (
+      {/* ETAPA: SELECCIÓN DE CATEGORÍA */}
+      {modo !== "inicio" && !categoria && etapa === "configuracion" && !conectado && (
+        <div className="setup-container">
+          <h2>ELIGE CATEGORÍA</h2>
+          <div className="category-grid">
+            {Object.keys(categoriasPalabras).map(cat => (
+              <button key={cat} className="btn-modern btn-category" onClick={() => setCategoria(cat)}>
+                {cat}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ETAPA: CONFIGURACIÓN (Solo se muestra si hay categoría elegida) */}
+      {etapa === "configuracion" && modo !== "inicio" && categoria && !conectado && (
         <div className="setup-container">
           <h2>{modo === "online" ? "SALA ONLINE" : "AJUSTES LOCAL"}</h2>
+          <p style={{fontSize:'0.8rem', color:'#00d2ff'}}>TEMÁTICA: {categoria}</p>
           {modo === "online" && <input className="input-box" placeholder="TU NOMBRE" onChange={e => setNombre(e.target.value.toUpperCase())} />}
           <label>JUGADORES</label>
           <input type="number" className="input-box" value={numJugadores} onChange={e => setNumJugadores(e.target.value)} />
@@ -236,7 +268,7 @@ export default function App() {
             <span>Pistas para impostores</span>
           </label>
           <button className="btn-modern btn-start" onClick={modo === "online" ? crearSalaOnline : iniciarJuegoLocal}>EMPEZAR</button>
-          {modo === "online" && <button className="btn-back" style={{marginTop:'10px'}} onClick={() => setEtapa("unirse")}>Tengo un código</button>}
+          {modo === "online" && <button className="btn-back" style={{marginTop:'10px', fontSize:'0.7rem'}} onClick={() => setEtapa("unirse")}>Tengo un código</button>}
         </div>
       )}
 
@@ -252,6 +284,7 @@ export default function App() {
       {etapa === "lobby" && conectado && (
         <div className="lobby-container">
           <h2>SALA: {salaId}</h2>
+          <p style={{color:'#00d2ff', fontSize:'0.8rem'}}>CATEGORÍA: {categoria}</p>
           <div className="lives-grid">
             {jugadoresLista.map((p, i) => <div key={i} className="player-item">❤️ {p.nombre}</div>)}
           </div>
@@ -327,19 +360,46 @@ export default function App() {
         </div>
       )}
 
-      {etapa === "decision_final" && (
-        <div className="setup-container">
-          <h1>PARTIDA TERMINADA</h1>
-          <div className="button-group">
-            <button className="btn-modern btn-next-round" onClick={forzarSiguienteRonda}>UNA RONDA MÁS</button>
-            <button className="btn-modern" onClick={() => update(ref(db, `salas/${salaId}`), { etapa: "resumen" })}>RESUMEN FINAL</button>
-          </div>
+   {etapa === "decision_final" && (
+  <div className="setup-container">
+    <h1>PARTIDA TERMINADA</h1>
+    <p>¿Qué quieren hacer ahora?</p>
+
+    {esHost ? (
+      <div className="next-round-box">
+        <label style={{fontSize: '0.8rem', marginBottom: '10px', display: 'block'}}>
+          CAMBIAR O MANTENER CATEGORÍA:
+        </label>
+        <div className="category-grid-mini">
+          {Object.keys(categoriasPalabras).map(cat => (
+            <button 
+              key={cat} 
+              className={`btn-cat-mini ${categoria === cat ? 'active' : ''}`}
+              onClick={() => setCategoria(cat)}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
-      )}
+        
+        <div className="button-group" style={{marginTop: '20px'}}>
+          <button className="btn-modern btn-next-round" onClick={() => forzarSiguienteRonda(categoria)}>
+            JUGAR SIGUIENTE RONDA
+          </button>
+          <button className="btn-modern" onClick={() => update(ref(db, `salas/${salaId}`), { etapa: "resumen" })}>
+            VER RESULTADOS FINALES
+          </button>
+        </div>
+      </div>
+    ) : (
+      <p className="animate-pulse">El host está decidiendo el siguiente paso...</p>
+    )}
+  </div>
+)}
 
       {etapa === "resumen" && (
         <div className="resumen-final">
-          <h1 style={{color: puntosEquipo > puntosImpostores ? '#00d2ff' : '#ff3131'}}>
+          <h1 style={{color: puntosEquipo >= puntosImpostores ? '#00d2ff' : '#ff3131'}}>
             GANADOR: {puntosEquipo >= puntosImpostores ? 'EQUIPO' : 'IMPOSTORES'}
           </h1>
           <div className="history-container">
