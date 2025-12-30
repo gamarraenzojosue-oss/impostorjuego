@@ -27,6 +27,8 @@ export default function App() {
   const [revelado, setRevelado] = useState(false);
   const [verRecordatorio, setVerRecordatorio] = useState(false);
   const [conectado, setConectado] = useState(false);
+  // Nuevo estado para que el modo local sea seguro
+  const [estaOculto, setEstaOculto] = useState(true);
 
   const [numJugadores, setNumJugadores] = useState(5);
   const [numImpostores, setNumImpostores] = useState(1);
@@ -77,6 +79,7 @@ export default function App() {
     setRevelado(false);
     setVerRecordatorio(false);
     setJugadorActualLocal(0);
+    setEstaOculto(true);
     window.history.replaceState({}, document.title, "/");
   };
 
@@ -97,6 +100,8 @@ export default function App() {
     }
     setJugadoresLista(roles);
     setEtapa("revelar");
+    setJugadorActualLocal(0);
+    setEstaOculto(true);
   };
 
   const crearSalaOnline = () => {
@@ -143,7 +148,6 @@ export default function App() {
         <button className="btn-back" onClick={volverAlInicio}>← VOLVER AL MENÚ</button>
       )}
 
-      {/* 1. MENÚ INICIAL */}
       {modo === "inicio" && (
         <>
           <h1 className="title-glow">IMPOSTOR</h1>
@@ -154,7 +158,6 @@ export default function App() {
         </>
       )}
 
-      {/* 2. CONFIGURACIÓN (PARA LOCAL O HOST ONLINE) */}
       {etapa === "configuracion" && modo !== "inicio" && !conectado && (
         <div className="setup-container">
           <h2>{modo === "online" ? "CREAR SALA ONLINE" : "AJUSTES LOCAL"}</h2>
@@ -178,7 +181,6 @@ export default function App() {
         </div>
       )}
 
-      {/* 3. PANTALLAS DE INVITADO (ONLINE) */}
       {modo === "online" && (etapa === "invitacion" || etapa === "unirse") && !conectado && (
         <div className="setup-container">
           <h2>{etapa === "invitacion" ? "SALA ENCONTRADA" : "UNIRSE"}</h2>
@@ -190,7 +192,6 @@ export default function App() {
         </div>
       )}
 
-      {/* 4. LOBBY (ESPERA) */}
       {etapa === "lobby" && conectado && (
         <div className="lobby-container">
           <h2>SALA: {salaId}</h2>
@@ -207,63 +208,80 @@ export default function App() {
         </div>
       )}
 
-      {/* 5. REVELAR PALABRA */}
       {etapa === "revelar" && (
         <div className="reveal-box">
           <h2>{modo === "local" ? jugadoresLista[jugadorActualLocal]?.nombre : (miRol?.nombre || nombre)}</h2>
-          {!revelado ? (
-            <button className="btn-modern" onClick={() => setRevelado(true)}>REVELAR ROL</button>
+          
+          {/* SEGURIDAD MODO LOCAL */}
+          {modo === "local" && estaOculto ? (
+            <div className="security-check">
+              <p className="pass-phone-text">Pasa el celular a este jugador.</p>
+              <button className="btn-modern" onClick={() => setEstaOculto(false)}>SOY YO, VER MI ROL</button>
+            </div>
           ) : (
             <div>
-              { (modo === "local" ? jugadoresLista[jugadorActualLocal].tipo : miRol?.tipo) === "impostor" ? (
-                <div className="role-card">
-                  <span className="text-impostor">IMPOSTOR</span>
-                  {conPista && <p className="pista-text">Pista: {modo === "local" ? jugadoresLista[jugadorActualLocal].pista : miRol?.pista}</p>}
-                </div>
+              {!revelado ? (
+                <button className="btn-modern" onClick={() => setRevelado(true)}>REVELAR ROL</button>
               ) : (
-                <div className="role-card">
-                  <p>TU PALABRA:</p>
-                  <span className="text-palabra">{palabraRonda}</span>
+                <div>
+                  { (modo === "local" ? jugadoresLista[jugadorActualLocal].tipo : miRol?.tipo) === "impostor" ? (
+                    <div className="role-card">
+                      <span className="text-impostor">IMPOSTOR</span>
+                      {conPista && <p className="pista-text">Pista: {modo === "local" ? jugadoresLista[jugadorActualLocal].pista : miRol?.pista}</p>}
+                    </div>
+                  ) : (
+                    <div className="role-card">
+                      <p>TU PALABRA:</p>
+                      <span className="text-palabra">{palabraRonda}</span>
+                    </div>
+                  )}
+                  <button className="btn-modern" style={{marginTop:'25px'}} onClick={() => {
+                    setRevelado(false);
+                    setEstaOculto(true); // Bloquear pantalla para el siguiente en local
+                    if (modo === "local") {
+                      if (jugadorActualLocal + 1 < numJugadores) setJugadorActualLocal(jugadorActualLocal+1);
+                      else setEtapa("partida");
+                    } else if (esHost) {
+                      update(ref(db, `salas/${salaId}`), { etapa: "partida" });
+                    }
+                  }}>
+                    {modo === "local" && jugadorActualLocal + 1 < numJugadores ? "SIGUIENTE JUGADOR" : (modo === "online" ? (esHost ? "IR A LA ARENA" : "ESPERANDO AL HOST...") : "IR A LA ARENA")}
+                  </button>
                 </div>
               )}
-              <button className="btn-modern" style={{marginTop:'25px'}} onClick={() => {
-                setRevelado(false);
-                if (modo === "local") {
-                  if (jugadorActualLocal + 1 < numJugadores) setJugadorActualLocal(jugadorActualLocal+1);
-                  else setEtapa("partida");
-                } else if (esHost) {
-                  update(ref(db, `salas/${salaId}`), { etapa: "partida" });
-                }
-              }}>
-                {modo === "local" && jugadorActualLocal + 1 < numJugadores ? "SIGUIENTE" : (esHost ? "IR A LA ARENA" : "ESPERANDO AL HOST...")}
-              </button>
             </div>
           )}
         </div>
       )}
 
-      {/* 6. PARTIDA (ARENA) */}
       {etapa === "partida" && (
         <div className="arena-container">
           <div className="lives-grid">
             {jugadoresLista.map((p, i) => (
               <div key={i} className={`player-item ${!p.vivo ? 'dead' : ''}`} 
-                onClick={() => (esHost || modo === "local") && (modo === "local" ? (setJugadoresLista(prev => {let n=[...prev]; n[i].vivo=!n[i].vivo; return n;})) : update(ref(db, `salas/${salaId}/jugadores/${p.nombre}`), { vivo: !p.vivo }))}>
+                onClick={() => (modo === "local" || esHost) && (modo === "local" ? (setJugadoresLista(prev => {let n=[...prev]; n[i].vivo=!n[i].vivo; return n;})) : update(ref(db, `salas/${salaId}/jugadores/${p.nombre}`), { vivo: !p.vivo }))}>
                 <span>{p.vivo ? "❤️" : "🖤"}</span><p>{p.nombre}</p>
               </div>
             ))}
           </div>
-          <button className="btn-copy" onClick={() => setVerRecordatorio(!verRecordatorio)}>👁️ RECORDAR ROL</button>
-          {verRecordatorio && (
-            <div className="recordatorio-popup">
-               { (modo === "local" ? jugadoresLista[jugadorActualLocal].tipo : miRol?.tipo) === "impostor" ? (
-                <p>Eres <strong>IMPOSTOR</strong>. {conPista && `Pista: ${modo === "local" ? jugadoresLista[jugadorActualLocal].pista : miRol?.pista}`}</p>
-              ) : (
-                <p>Palabra: <strong>{palabraRonda}</strong></p>
+
+          {/* EL BOTÓN DE RECORDAR SOLO SALE EN MODO ONLINE */}
+          {modo === "online" && (
+            <>
+              <button className="btn-copy" onClick={() => setVerRecordatorio(!verRecordatorio)}>👁️ RECORDAR ROL</button>
+              {verRecordatorio && (
+                <div className="recordatorio-popup">
+                  { (miRol?.tipo) === "impostor" ? (
+                    <p>Eres <strong>IMPOSTOR</strong>. {conPista && `Pista: ${miRol?.pista}`}</p>
+                  ) : (
+                    <p>Palabra: <strong>{palabraRonda}</strong></p>
+                  )}
+                </div>
               )}
-            </div>
+            </>
           )}
-          {(esHost || modo === "local") && <button className="btn-modern btn-danger" onClick={() => {if(modo === "online") remove(ref(db, 'salas/' + salaId)); volverAlInicio();}}>REINICIAR</button>}
+
+          {(modo === "local" || esHost) && <button className="btn-modern btn-danger" style={{marginTop:'20px'}} onClick={() => {if(modo === "online") remove(ref(db, 'salas/' + salaId)); volverAlInicio();}}>REINICIAR</button>}
         </div>
       )}
     </div>
