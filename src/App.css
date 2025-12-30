@@ -128,3 +128,51 @@ input[type="number"]:focus {
   margin-bottom: 20px;
   cursor: pointer;
 }
+.btn-back {
+  background: none;
+  border: 1px solid #333;
+  color: #666;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  margin-bottom: 20px;
+  transition: 0.3s;
+}
+
+.btn-back:hover {
+  border-color: var(--modern-red);
+  color: var(--modern-red);
+}
+
+.player-item p {
+  margin: 5px 0 0 0;
+  font-size: 0.8rem;
+}
+.btn-copy {
+  background: #1a1a1a;
+  border: 1px solid var(--modern-blue);
+  color: var(--modern-blue);
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  margin-bottom: 15px;
+}
+
+.btn-danger {
+  border-color: var(--modern-red) !important;
+  color: var(--modern-red) !important;
+  margin-top: 20px;
+}
+
+.btn-danger:hover {
+  background-color: var(--modern-red) !important;
+  color: white !important;
+}
+
+.pista-text {
+  color: #888;
+  font-style: italic;
+  margin-top: 10px;
+}
