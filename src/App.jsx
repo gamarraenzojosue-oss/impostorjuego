@@ -20,28 +20,23 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 export default function App() {
-  // ESTADOS DE NAVEGACIÓN Y FLUJO
-  const [modo, setModo] = useState("inicio"); // inicio, local, online
-  const [etapa, setEtapa] = useState("configuracion"); // configuracion, unirse, invitacion, lobby, revelar, partida
-  
-  // DATOS DE USUARIO Y SALA
+  const [modo, setModo] = useState("inicio"); 
+  const [etapa, setEtapa] = useState("configuracion"); 
   const [nombre, setNombre] = useState("");
   const [salaId, setSalaId] = useState("");
   const [esHost, setEsHost] = useState(false);
   const [revelado, setRevelado] = useState(false);
+  const [verRecordatorio, setVerRecordatorio] = useState(false);
 
-  // CONFIGURACIÓN DE LA PARTIDA
   const [numJugadores, setNumJugadores] = useState(5);
   const [numImpostores, setNumImpostores] = useState(1);
   const [conPista, setConPista] = useState(true);
 
-  // ESTADOS DE JUEGO (DATOS DINÁMICOS)
   const [jugadoresLista, setJugadoresLista] = useState([]);
   const [miRol, setMiRol] = useState(null);
   const [palabraRonda, setPalabraRonda] = useState("");
   const [jugadorActualLocal, setJugadorActualLocal] = useState(0);
 
-  // 1. LÓGICA DE DETECCIÓN DE LINK (URL PARAMETERS)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const salaParam = params.get("sala");
@@ -52,7 +47,6 @@ export default function App() {
     }
   }, []);
 
-  // 2. ESCUCHADOR DE FIREBASE PARA MODO ONLINE
   useEffect(() => {
     if (modo === "online" && salaId && etapa !== "invitacion") {
       const salaRef = ref(db, 'salas/' + salaId.toUpperCase());
@@ -70,51 +64,41 @@ export default function App() {
           const yo = lista.find(p => p.nombre === nombre.toUpperCase());
           if (yo) setMiRol(yo);
         } else {
-          // Si el host borra la sala, todos vuelven al inicio
-          if (etapa !== "configuracion" && etapa !== "unirse") {
-            volverAlInicio();
-          }
+          if (etapa !== "configuracion" && etapa !== "unirse") volverAlInicio();
         }
       });
       return () => unsubscribe();
     }
   }, [modo, salaId, nombre, etapa]);
 
-  // --- ACCIONES GENERALES ---
   const volverAlInicio = () => {
     setModo("inicio");
     setEtapa("configuracion");
     setSalaId("");
     setEsHost(false);
     setRevelado(false);
+    setVerRecordatorio(false);
     setJugadorActualLocal(0);
     window.history.replaceState({}, document.title, "/");
   };
 
   const copiarLink = () => {
     const link = `${window.location.origin}?sala=${salaId}`;
-    navigator.clipboard.writeText(link).then(() => {
-      alert("¡Link copiado correctamente!");
-    });
+    navigator.clipboard.writeText(link).then(() => alert("¡Link copiado!"));
   };
 
-  // --- LÓGICA MODO LOCAL (UN SOLO DISPOSITIVO) ---
   const iniciarJuegoLocal = () => {
     if (numJugadores < 3) return alert("Mínimo 3 jugadores");
     const item = listaPalabras[Math.floor(Math.random() * listaPalabras.length)];
     setPalabraRonda(item.palabra);
-    
     let rolesTemp = Array(Number(numJugadores)).fill(null).map((_, i) => ({
       nombre: `JUGADOR ${i + 1}`, tipo: "jugador", vivo: true
     }));
-    
     let indices = [...Array(Number(numJugadores)).keys()].sort(() => Math.random() - 0.5);
     for (let i = 0; i < numImpostores; i++) {
       rolesTemp[indices[i]] = { 
-        nombre: `JUGADOR ${indices[i] + 1}`, 
-        tipo: "impostor", 
-        pista: conPista ? item.pistas[0] : null, 
-        vivo: true 
+        nombre: `JUGADOR ${indices[i] + 1}`, tipo: "impostor", 
+        pista: conPista ? item.pistas[0] : null, vivo: true 
       };
     }
     setJugadoresLista(rolesTemp);
@@ -122,9 +106,8 @@ export default function App() {
     setJugadorActualLocal(0);
   };
 
-  // --- LÓGICA MODO ONLINE ---
   const crearSalaOnline = () => {
-    if (!nombre) return alert("Por favor, ingresa tu nombre");
+    if (!nombre) return alert("Ingresa tu nombre");
     const id = Math.random().toString(36).substring(2, 6).toUpperCase();
     setSalaId(id);
     setEsHost(true);
@@ -135,57 +118,46 @@ export default function App() {
     });
   };
 
-  const unirseSalaManual = () => {
-    if (!nombre || !salaId) return alert("Faltan datos");
-    setEtapa("lobby"); // Pasamos al lobby para empezar a escuchar los datos de esa sala
-  };
-
   const aceptarInvitacion = () => {
-    if (!nombre) return alert("Ingresa tu nombre para entrar");
+    if (!nombre) return alert("Ingresa tu nombre");
     update(ref(db, `salas/${salaId}/jugadores/${nombre.toUpperCase()}`), {
-      nombre: nombre.toUpperCase(),
-      vivo: true,
-      host: false
-    }).then(() => {
-      setEtapa("lobby");
-    });
+      nombre: nombre.toUpperCase(), vivo: true, host: false
+    }).then(() => setEtapa("lobby"));
   };
 
   const iniciarPartidaOnline = () => {
-    if (jugadoresLista.length < 3) return alert("Faltan jugadores para iniciar");
+    if (jugadoresLista.length < 3) return alert("Mínimo 3 jugadores");
     const item = listaPalabras[Math.floor(Math.random() * listaPalabras.length)];
     const updates = {};
     let baraja = [...jugadoresLista].sort(() => Math.random() - 0.5);
-    
     jugadoresLista.forEach((p) => {
       const esImp = baraja.slice(0, numImpostores).some(imp => imp.nombre === p.nombre);
       updates[`salas/${salaId}/jugadores/${p.nombre}/tipo`] = esImp ? "impostor" : "jugador";
       updates[`salas/${salaId}/jugadores/${p.nombre}/pista`] = (esImp && conPista) ? item.pistas[0] : null;
       updates[`salas/${salaId}/jugadores/${p.nombre}/vivo`] = true;
     });
-
     updates[`salas/${salaId}/etapa`] = "revelar";
     updates[`salas/${salaId}/palabraRonda`] = item.palabra;
     update(ref(db), updates);
   };
 
+  const irALaArenaOnline = () => {
+    update(ref(db, `salas/${salaId}`), { etapa: "partida" });
+  };
+
   const terminarYBorrarSala = () => {
-    if (window.confirm("¿Seguro que quieres terminar? Se reiniciará para todos.")) {
-      if (modo === "online") {
-        remove(ref(db, 'salas/' + salaId));
-      }
+    if (window.confirm("¿Seguro? Se reiniciará para todos.")) {
+      if (modo === "online") remove(ref(db, 'salas/' + salaId));
       volverAlInicio();
     }
   };
 
   return (
     <div className="main-card">
-      {/* BOTÓN VOLVER (Disponible en configuración y lobby) */}
       {modo !== "inicio" && etapa !== "partida" && (
-        <button className="btn-back" onClick={volverAlInicio}>← VOLVER AL MENÚ</button>
+        <button className="btn-back" onClick={volverAlInicio}>← VOLVER</button>
       )}
 
-      {/* 1. MENÚ PRINCIPAL */}
       {modo === "inicio" && (
         <>
           <h1 className="title-glow">IMPOSTOR</h1>
@@ -196,13 +168,10 @@ export default function App() {
         </>
       )}
 
-      {/* 2. CONFIGURACIÓN (LOCAL O CREAR ONLINE) */}
       {modo !== "inicio" && etapa === "configuracion" && (
         <>
-          <h2>{modo === "online" ? "CREAR SALA ONLINE" : "CONFIGURAR PARTIDA"}</h2>
-          {modo === "online" && (
-            <input className="input-box" placeholder="TU NOMBRE" onChange={e => setNombre(e.target.value.toUpperCase())} />
-          )}
+          <h2>CONFIGURAR {modo === "online" ? "SALA" : "PARTIDA"}</h2>
+          {modo === "online" && <input className="input-box" placeholder="TU NOMBRE" onChange={e => setNombre(e.target.value.toUpperCase())} />}
           <div className="input-group">
             <label>JUGADORES</label>
             <input type="number" className="input-box" value={numJugadores} onChange={e => setNumJugadores(e.target.value)} />
@@ -211,129 +180,87 @@ export default function App() {
             <label>IMPOSTORES</label>
             <input type="number" className="input-box" value={numImpostores} onChange={e => setNumImpostores(e.target.value)} />
           </div>
-          <label className="checkbox-container">
-            <input type="checkbox" checked={conPista} onChange={() => setConPista(!conPista)} />
-            <span>Pistas para impostores</span>
-          </label>
-          <button className="btn-modern btn-start" onClick={modo === "online" ? crearSalaOnline : iniciarJuegoLocal}>
-            {modo === "online" ? "GENERAR SALA Y LINK" : "EMPEZAR"}
-          </button>
-          {modo === "online" && (
-            <button className="btn-back" style={{marginTop: '15px'}} onClick={() => setEtapa("unirse")}>Ya tengo un código</button>
-          )}
+          <button className="btn-modern btn-start" onClick={modo === "online" ? crearSalaOnline : iniciarJuegoLocal}>EMPEZAR</button>
+          {modo === "online" && <button className="btn-back" style={{marginTop:'10px'}} onClick={()=>setEtapa("unirse")}>Ya tengo código</button>}
         </>
       )}
 
-      {/* 3. PANTALLA DE UNIRSE (MANUAL) */}
       {modo === "online" && etapa === "unirse" && (
         <>
-          <h2>UNIRSE A SALA</h2>
+          <h2>UNIRSE</h2>
           <input className="input-box" placeholder="TU NOMBRE" onChange={e => setNombre(e.target.value.toUpperCase())} />
-          <input className="input-box" placeholder="CÓDIGO (Ej: AX42)" value={salaId} onChange={e => setSalaId(e.target.value.toUpperCase())} />
-          <button className="btn-modern" onClick={aceptarInvitacion}>ENTRAR A LA SALA</button>
+          <input className="input-box" placeholder="CÓDIGO" value={salaId} onChange={e => setSalaId(e.target.value.toUpperCase())} />
+          <button className="btn-modern" onClick={aceptarInvitacion}>ENTRAR</button>
         </>
       )}
 
-      {/* 4. PANTALLA DE INVITACIÓN (POR LINK) */}
       {modo === "online" && etapa === "invitacion" && (
         <>
-          <h2>INVITACIÓN RECIBIDA</h2>
+          <h2>HAS SIDO INVITADO</h2>
           <div className="sala-badge">SALA: {salaId}</div>
-          <p>Introduce tu nombre para unirte:</p>
           <input className="input-box" placeholder="TU NOMBRE" onChange={e => setNombre(e.target.value.toUpperCase())} />
-          <button className="btn-modern btn-start" onClick={aceptarInvitacion}>ACEPTAR Y ENTRAR</button>
+          <button className="btn-modern btn-start" onClick={aceptarInvitacion}>ACEPTAR</button>
         </>
       )}
 
-      {/* 5. LOBBY DE ESPERA (ONLINE) */}
       {modo === "online" && etapa === "lobby" && (
         <>
           <div className="sala-header">
-            <h2 style={{color: 'var(--modern-blue)'}}>SALA: {salaId}</h2>
-            <button className="btn-copy" onClick={copiarLink}>🔗 COPIAR LINK</button>
+            <h2 style={{color:'var(--modern-blue)'}}>SALA: {salaId}</h2>
+            <button className="btn-copy" onClick={copiarLink}>🔗 LINK</button>
           </div>
-          <p className="status-text">Jugadores en sala: {jugadoresLista.length}</p>
           <div className="lives-grid">
-            {jugadoresLista.map((p, i) => (
-              <div key={i} className="player-item">❤️ {p.nombre}</div>
-            ))}
+            {jugadoresLista.map((p, i) => <div key={i} className="player-item">❤️ {p.nombre}</div>)}
           </div>
-          {esHost ? (
-            <button className="btn-modern btn-start" onClick={iniciarPartidaOnline}>EMPEZAR JUEGO</button>
-          ) : (
-            <div className="waiting-container">
-              <p className="animate-pulse">Esperando que el anfitrión inicie...</p>
-            </div>
-          )}
+          {esHost ? <button className="btn-modern btn-start" onClick={iniciarPartidaOnline}>INICIAR REVELACIÓN</button> : <p className="animate-pulse">Esperando al host...</p>}
         </>
       )}
 
-      {/* 6. REVELAR PALABRA / ROL */}
       {etapa === "revelar" && (
         <div className="reveal-box">
-          <h2 className="reveal-title">
-            {modo === "local" ? jugadoresLista[jugadorActualLocal]?.nombre : "TU ROL"}
-          </h2>
+          <h2>{modo === "local" ? jugadoresLista[jugadorActualLocal]?.nombre : "TU ROL"}</h2>
           {!revelado ? (
-            <button className="btn-modern" onClick={() => setRevelado(true)}>VER MI ROL</button>
+            <button className="btn-modern" onClick={() => setRevelado(true)}>VER ROL</button>
           ) : (
-            <div className="revealed-content">
-              { (modo === "local" ? jugadoresLista[jugadorActualLocal].tipo : miRol?.tipo) === "impostor" ? (
-                <>
-                  <span className="text-impostor">IMPOSTOR</span>
-                  <p className="pista-text">Pista: {modo === "local" ? jugadoresLista[jugadorActualLocal].pista : miRol?.pista}</p>
-                </>
-              ) : (
-                <>
-                  <p className="label-rol">TU PALABRA ES:</p>
-                  <span className="text-palabra">{palabraRonda}</span>
-                </>
-              )}
-              <button className="btn-modern" style={{marginTop: '30px'}} onClick={() => {
+            <div>
+              <span className={(modo === "local" ? jugadoresLista[jugadorActualLocal].tipo : miRol?.tipo) === "impostor" ? "text-impostor" : "text-palabra"}>
+                {(modo === "local" ? jugadoresLista[jugadorActualLocal].tipo : miRol?.tipo) === "impostor" ? "IMPOSTOR" : palabraRonda}
+              </span>
+              <button className="btn-modern" style={{marginTop:'25px'}} onClick={() => {
                 setRevelado(false);
                 if (modo === "local") {
                   if (jugadorActualLocal + 1 < numJugadores) setJugadorActualLocal(jugadorActualLocal + 1);
                   else setEtapa("partida");
-                } else {
-                  setEtapa("partida");
-                }
+                } else if (esHost) irALaArenaOnline();
               }}>
-                {modo === "local" && jugadorActualLocal + 1 < numJugadores ? "SIGUIENTE JUGADOR" : "LISTO PARA JUGAR"}
+                {modo === "local" && jugadorActualLocal + 1 < numJugadores ? "SIGUIENTE" : (esHost ? "IR A LA ARENA" : "ESPERANDO AL HOST...")}
               </button>
             </div>
           )}
         </div>
       )}
 
-      {/* 7. PARTIDA (ELIMINACIÓN) */}
       {etapa === "partida" && (
         <>
-          <h1 className="arena-title">LA ARENA</h1>
           <div className="lives-grid">
             {jugadoresLista.map((p, idx) => (
-              <div 
-                key={idx} 
-                className={`player-item ${!p.vivo ? 'dead' : ''}`} 
+              <div key={idx} className={`player-item ${!p.vivo ? 'dead' : ''}`} 
                 onClick={() => {
                   if (modo === "local") {
-                    const copia = [...jugadoresLista];
-                    copia[idx].vivo = !copia[idx].vivo;
-                    setJugadoresLista(copia);
-                  } else if (esHost) {
-                    update(ref(db, `salas/${salaId}/jugadores/${p.nombre}`), { vivo: !p.vivo });
-                  }
-                }}
-              >
-                <span className="heart-icon">{p.vivo ? "❤️" : "🖤"}</span>
-                <p className="player-name">{p.nombre}</p>
+                    const c = [...jugadoresLista]; c[idx].vivo = !c[idx].vivo; setJugadoresLista(c);
+                  } else if (esHost) update(ref(db, `salas/${salaId}/jugadores/${p.nombre}`), { vivo: !p.vivo });
+                }}>
+                <span>{p.vivo ? "❤️" : "🖤"}</span><p>{p.nombre}</p>
               </div>
             ))}
           </div>
-          {(modo === "local" || esHost) && (
-            <div className="admin-actions">
-              <button className="btn-modern btn-danger" onClick={terminarYBorrarSala}>TERMINAR Y NUEVA PARTIDA</button>
-            </div>
-          )}
+          <div className="admin-actions">
+            <button className="btn-copy" onClick={() => setVerRecordatorio(!verRecordatorio)}>👁️ {verRecordatorio ? "OCULTAR" : "VER MI PALABRA"}</button>
+            {verRecordatorio && (
+              <p className="recordatorio-text">Tu rol: <strong>{miRol?.tipo === "impostor" ? "IMPOSTOR" : palabraRonda}</strong></p>
+            )}
+            {(modo === "local" || esHost) && <button className="btn-modern btn-danger" style={{marginTop:'20px'}} onClick={terminarYBorrarSala}>TERMINAR JUEGO</button>}
+          </div>
         </>
       )}
     </div>
